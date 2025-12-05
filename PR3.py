@@ -1,6 +1,7 @@
 import argparse
 from typing import Dict, List
 import csv
+import os
 
 class InstructionSpec:
     name: str
@@ -88,16 +89,6 @@ def save_binary(filename: str, program: List[int]):
         for w in program:
             f.write(w.to_bytes(8, "little"))
 
-
-def decode_instruction(word: int) -> Dict[str, int]:
-    spec = detect_opcode(word)
-    decoded = {"OPName": spec.name}
-
-    for field, (lo, hi) in spec.fields.items():
-        mask = (1 << (hi - lo + 1)) - 1
-        decoded[field] = (word >> lo) & mask
-    return decoded
-
 def detect_opcode(word: int) -> InstructionSpec:
     opcode = word & 0x3F
     for spec in COMMANDS.values():
@@ -119,14 +110,17 @@ def main():
 
     if args.test:
         for w in program:
-            instruction = decode_instruction(w)
-            print(instruction)
             inbytes = f"{w:016X}"
+            inbyteslist = []
             while (inbytes):
-                print("0x" +inbytes[-2:])
+                inbyteslist.append("0x" +inbytes[-2:])
                 inbytes = inbytes[:len(inbytes) - 2]
+            print(inbyteslist)
+            print()
+
     else:
         save_binary(args.out, program)
+        print("The file size is: ", os.path.getsize(args.out))
 
 if __name__ == "__main__":
     main()

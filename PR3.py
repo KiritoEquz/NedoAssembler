@@ -112,15 +112,16 @@ def main():
         for w in program:
             inbytes = f"{w:016X}"
             inbyteslist = []
-            while (inbytes):
+            while inbytes:
                 inbyteslist.append("0x" +inbytes[-2:])
                 inbytes = inbytes[:len(inbytes) - 2]
-            print(inbyteslist)
+            for byte in inbyteslist:
+                print(byte, end=" ")
             print()
 
     else:
         save_binary(args.out, program)
-        print("The file size is: ", os.path.getsize(args.out))
+        print("The file size is: ", os.path.getsize(args.out), "bytes")
 
 if __name__ == "__main__":
     main()

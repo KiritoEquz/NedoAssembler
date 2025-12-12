@@ -1,4 +1,5 @@
 import argparse
+import struct
 from typing import Dict, List
 import csv
 import os
@@ -65,6 +66,23 @@ def encode_instruction(spec: InstructionSpec, values: Dict[str, int]) -> int:
         word |= (v << lo)
     return word
 
+def decode_instruction(word: int):
+    opcode = word & 0x3F
+    spec = None
+    for s in COMMANDS.values():
+        if s.code == opcode:
+            spec = s
+            break
+    if spec is None:
+        raise ValueError(f"Unknown opcode: {opcode}")
+
+    fields = {}
+    for k, (lo, hi) in spec.fields.items():
+        width = hi - lo + 1
+        fields[k] = (word >> lo) & ((1 << width) - 1)
+
+    return spec, fields
+
 
 def parse_csv_program(path: str) -> List[int]:
     result = []
@@ -89,26 +107,31 @@ def save_binary(filename: str, program: List[int]):
         for w in program:
             f.write(w.to_bytes(8, "little"))
 
-def detect_opcode(word: int) -> InstructionSpec:
-    opcode = word & 0x3F
-    for spec in COMMANDS.values():
-        if spec.code == opcode:
-            return spec
-    raise ValueError(f"Unknown opcode: {opcode}")
+
+def load_binary(filename: str) -> List[int]:
+    program = []
+    with open(filename, "rb") as f:
+        while True:
+            data = f.read(8)
+            if not data:
+                break
+            if len(data) != 8:
+                raise ValueError("Invalid binary file: instruction not 8 bytes")
+            word = int.from_bytes(data, byteorder="little", signed=False)
+            program.append(word)
+    return program
+
+def save_csv(out: str, start: int, end: int, memory: List[int]):
+    with open(out, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        for i in range(start, end+1):
+            writer.writerow([i, memory[i]])
 
 
+def assembly(src: str, out: str, test: bool):
+    program = parse_csv_program(src)
 
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("src")
-    parser.add_argument("out")
-    parser.add_argument("--test", action="store_true")
-    args = parser.parse_args()
-
-    program = parse_csv_program(args.src)
-
-    if args.test:
+    if test:
         for w in program:
             inbytes = f"{w:016X}"
             inbyteslist = []
@@ -120,8 +143,45 @@ def main():
             print()
 
     else:
-        save_binary(args.out, program)
-        print("The file size is: ", os.path.getsize(args.out), "bytes")
+        save_binary(out, program)
+        print("The file size is: ", os.path.getsize(out), "bytes")
+
+
+def interpret(src: str, out: str, start: int, end: int):
+    progMemory = []
+    registers = [0]*2048
+    program = load_binary(src)
+    for p in program:
+        progMemory.append(decode_instruction(p))
+
+    for (p, op) in progMemory:
+        if p.code == 57:
+            registers[op['B']] = op['C']
+
+        elif p.code == 46:
+            registers[op['B']] = registers[op['C']]
+
+        elif p.code == 11:
+            registers[op['C']] = registers[op['B']]
+
+    save_csv(out, start, end, registers)
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("op")
+    parser.add_argument("src")
+    parser.add_argument("out")
+    parser.add_argument("--test", action="store_true")
+    parser.add_argument('-s', '--start', type = int, required = False)
+    parser.add_argument('-e', '--end', type = int, required = False)
+
+
+    args = parser.parse_args()
+    if args.op == "a":
+        assembly(args.src, args.out, args.test)
+    if args.op == "i":
+        interpret(args.src, args.out, args.start, args.end)
 
 if __name__ == "__main__":
     main()

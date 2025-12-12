@@ -149,7 +149,12 @@ def assembly(src: str, out: str, test: bool):
 
 def interpret(src: str, out: str, start: int, end: int):
     progMemory = []
-    registers = [0]*2048
+    registers = [0]*100
+
+    for i in range(5):
+        registers[i] = i+1
+
+
     program = load_binary(src)
     for p in program:
         progMemory.append(decode_instruction(p))
